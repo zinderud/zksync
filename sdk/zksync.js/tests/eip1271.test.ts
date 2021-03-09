@@ -24,3 +24,20 @@ describe('EIP1271 signature check', function () {
         expect(signatureValid, 'EIP1271 signature is invalid').to.be.true;
     });
 });
+
+describe('EIP1271 signature check', () => {
+    it('Test EIP1271 signature', async () => {
+        const initMessage = "Merhaba";
+        const initialMessageByte = ethers.utils.toUtf8Bytes(initMessage);
+        const message = zkUtils.getSignedBytesFromMessage(initMessage, false);
+        const signature = await zkUtils.signMessagePersonalAPI(ethSigner, message);
+        const signatureValid = await zkUtils.verifyERC1271Signature(
+            testConfig.eip1271.contract_address,
+            initialMessageByte,
+            signature,
+            ethSigner
+        );
+        expect(signatureValid, 'EIP1271 signature is invalid').to.be.true;
+    })
+
+})
