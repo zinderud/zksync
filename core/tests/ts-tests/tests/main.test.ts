@@ -110,6 +110,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testInvalidFeeBatch(alice, bob, token, TX_AMOUNT);
     });
 
     step('should test batch-builder', async () => {
@@ -215,6 +216,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     describe('CREATE2 tests', () => {
         let hilda: Wallet;
+        let frida: Wallet;
 
         step('should setup a create2 account', async () => {
             if (onlyBasic) {
@@ -237,14 +239,23 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             await tester.testBatch(hilda, david, token, TX_AMOUNT);
         });
 
-        it('should fail eth-signed tx from create2 account', async () => {
+        step('should set pubkey and transfer in single batch', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            frida = await tester.create2Wallet();
+            await tester.testDeposit(frida, token, DEPOSIT_AMOUNT, true);
+            await tester.testCreate2CPKandTransfer(frida, david, token, TX_AMOUNT);
+        });
+
+        step('should fail eth-signed tx from create2 account', async () => {
             if (onlyBasic) {
                 return;
             }
             await tester.testCreate2TxFail(hilda, david, token, TX_AMOUNT);
         });
 
-        it('should fail eth-signed batch from create2 account', async () => {
+        step('should fail eth-signed batch from create2 account', async () => {
             if (onlyBasic) {
                 return;
             }

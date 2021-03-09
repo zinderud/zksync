@@ -1,7 +1,7 @@
 //! Helper module to submit transactions into the zkSync Network.
 
 // Built-in uses
-use std::{fmt::Display, str::FromStr};
+use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 // External uses
 use bigdecimal::BigDecimal;
@@ -21,7 +21,7 @@ use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash,
     },
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 
 // Local uses
@@ -322,14 +322,16 @@ impl TxSender {
             let tx_fee_info = tx.tx.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                // Save the transaction type before moving on to the next one, otherwise
+                // the total fee won't get affected by it.
+                transaction_types.push((tx_type, address));
+
                 if provided_fee == BigUint::zero() {
                     continue;
                 }
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
-
-                transaction_types.push((tx_type, address));
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
@@ -447,9 +449,18 @@ impl TxSender {
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, sender, token, sender_type, msg_to_sign) in
+
+            // This hashset holds addresses that have performed a CREATE2 ChangePubKey
+            // within this batch, so that we don't check ETH signatures on their transactions
+            // from this batch. We save the account type to the db later.
+            let mut create2_senders = HashSet::<H160>::new();
+
+            for (tx, sender, token, mut sender_type, msg_to_sign) in
                 izip!(txs, tx_senders, tokens, tx_sender_types, messages_to_sign)
             {
+                if create2_senders.contains(&sender) {
+                    sender_type = EthAccountType::CREATE2;
+                }
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
                     sender,
@@ -461,6 +472,14 @@ impl TxSender {
                 )
                 .await?
                 .unwrap_tx();
+
+                if let ZkSyncTx::ChangePubKey(tx) = tx.tx {
+                    if let Some(auth_data) = tx.eth_auth_data {
+                        if auth_data.is_create2() {
+                            create2_senders.insert(sender);
+                        }
+                    }
+                }
 
                 verified_txs.push(verified_tx);
             }
