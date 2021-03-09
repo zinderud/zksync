@@ -26,3 +26,30 @@ describe('Provider tests', function () {
         }
     });
 });
+
+
+describe("provider test", () => {
+    it('updateToken ', async () => {
+        const key = new Uint8Array(new Array(32).fill(5));
+        const localhostTokens = getTokens('localhost');
+        const tokens = localhostTokens.slice(0, 1);
+        const provider = await Provider.newMockProvider('localhost', key, () => [...tokens]);
+
+        tokens.push(localhostTokens[1]);
+        await provider.updateTokenSet();
+
+        for (const token of tokens) {
+            const resolvedToken = {
+                symbol: provider.tokenSet.resolveTokenSymbol(token.symbol),
+                decimals: provider.tokenSet.resolveTokenDecimals(token.symbol),
+                address: provider.tokenSet.resolveTokenAddress(token.symbol),
+                // name is not stored in tokenSet, so we just have to copy it
+                name: token.name
+            };
+            expect(resolvedToken).to.eql(token, 'Token set has not been updated');
+        }
+
+    });
+
+
+});
