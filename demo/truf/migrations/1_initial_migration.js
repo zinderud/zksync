@@ -1,5 +1,4 @@
-const Migrations = artifacts.require("Migrations");
-
+var ZkSync = artifacts.require("./ZkSync.sol");
 module.exports = function (deployer) {
-  deployer.deploy(Migrations);
+  deployer.deploy(ZkSync);
 };
